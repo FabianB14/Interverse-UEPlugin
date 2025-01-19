@@ -1,0 +1,35 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "1.0",
+    "FriendlyName": "Interverse Chain Integration",
+    "Description": "Cross-game asset integration with Interverse blockchain",
+    "Category": "Blockchain",
+    "CreatedBy": "Your Name",
+    "CreatedByURL": "",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "SupportURL": "",
+    "EngineVersion": "5.5.0",
+    "EnabledByDefault": true,
+    "CanContainContent": true,
+    "IsBetaVersion": false,
+    "Modules": [
+        {
+            "Name": "InterverseChainPlugin",
+            "Type": "Runtime",
+            "LoadingPhase": "Default",
+            "PlatformAllowList": [
+                "Win64",
+                "Mac",
+                "Linux"
+            ]
+        }
+    ],
+    "Plugins": [
+        {
+            "Name": "WebSockets",
+            "Enabled": true
+        }
+    ]
+}
