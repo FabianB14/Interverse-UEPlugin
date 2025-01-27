@@ -5,10 +5,11 @@ UInterverseInventoryComponent::UInterverseInventoryComponent()
     PrimaryComponentTick.bCanEverTick = false;
 }
 
-bool UInterverseInventoryComponent::AddItem(const FInterverseAsset& Asset)
+bool UInterverseInventoryComponent::AddItem(const FInterverseAsset& Asset, const FString& PlayerGlobalID)
 {
     FInterverseInventoryItem NewItem;
     NewItem.Asset = Asset;
+    NewItem.OwnerGlobalID = PlayerGlobalID;
     NewItem.IsEquipped = false;
     NewItem.Slot = Items.Num();
     
@@ -66,6 +67,71 @@ TArray<FInterverseInventoryItem> UInterverseInventoryComponent::GetItemsByCatego
         }
     }
     return FilteredItems;
+}
+
+TArray<FInterverseInventoryItem> UInterverseInventoryComponent::GetPlayerItems(const FString& PlayerGlobalID) const
+{
+    TArray<FInterverseInventoryItem> PlayerItems;
+    for (const FInterverseInventoryItem& Item : Items)
+    {
+        if (Item.OwnerGlobalID == PlayerGlobalID)
+        {
+            PlayerItems.Add(Item);
+        }
+    }
+    return PlayerItems;
+}
+
+bool UInterverseInventoryComponent::AddItemToPlayerInventory(const FInterverseAsset& Asset, const FString& PlayerGlobalID)
+{
+    FInterverseInventoryItem NewItem;
+    NewItem.Asset = Asset;
+    NewItem.OwnerGlobalID = PlayerGlobalID;
+    NewItem.IsEquipped = false;
+    NewItem.Slot = Items.Num();
+    
+    Items.Add(NewItem);
+    OnInventoryUpdated.Broadcast(Items);
+    return true;
+}
+
+TArray<FInterverseInventoryItem> UInterverseInventoryComponent::GetPlayerInventory(const FString& PlayerGlobalID) const
+{
+    TArray<FInterverseInventoryItem> PlayerItems;
+    for (const FInterverseInventoryItem& Item : Items)
+    {
+        if (Item.OwnerGlobalID == PlayerGlobalID)
+        {
+            PlayerItems.Add(Item);
+        }
+    }
+    return PlayerItems;
+}
+
+bool UInterverseInventoryComponent::TransferItemBetweenPlayers(const FString& AssetId, const FString& FromPlayerID, const FString& ToPlayerID)
+{
+    for (FInterverseInventoryItem& Item : Items)
+    {
+        if (Item.Asset.AssetId == AssetId && Item.OwnerGlobalID == FromPlayerID)
+        {
+            Item.OwnerGlobalID = ToPlayerID;
+            OnInventoryUpdated.Broadcast(Items);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UInterverseInventoryComponent::AddItem(const FInterverseAsset& Asset)
+{
+    FInterverseInventoryItem NewItem;
+    NewItem.Asset = Asset;
+    NewItem.IsEquipped = false;
+    NewItem.Slot = Items.Num();
+    
+    Items.Add(NewItem);
+    OnInventoryUpdated.Broadcast(Items);
+    return true;
 }
 
 bool UInterverseInventoryComponent::HasItem(const FString& AssetId) const

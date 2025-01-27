@@ -5,7 +5,7 @@
     "FriendlyName": "Interverse Chain Integration",
     "Description": "Cross-game asset integration with Interverse blockchain",
     "Category": "Blockchain",
-    "CreatedBy": "Your Name",
+    "CreatedBy": "Acquire 2021",
     "CreatedByURL": "",
     "DocsURL": "",
     "MarketplaceURL": "",
@@ -28,7 +28,7 @@
     ],
     "Plugins": [
         {
-            "Name": "WebSockets",
+            "Name": "WebSocketNetworking",
             "Enabled": true
         }
     ]

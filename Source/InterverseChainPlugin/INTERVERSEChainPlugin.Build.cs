@@ -1,4 +1,5 @@
 using UnrealBuildTool;
+using System.IO;
 
 public class InterverseChainPlugin : ModuleRules
 {
@@ -8,13 +9,13 @@ public class InterverseChainPlugin : ModuleRules
         
         PublicIncludePaths.AddRange(
             new string[] {
-                "InterverseChainPlugin/Public"
+                Path.Combine(ModuleDirectory, "Public")
             }
         );
 
         PrivateIncludePaths.AddRange(
             new string[] {
-                // ... add other private include paths required here ...
+                Path.Combine(ModuleDirectory, "Private")
             }
         );
 
@@ -31,11 +32,14 @@ public class InterverseChainPlugin : ModuleRules
             }
         );
 
-        PrivateDependencyModuleNames.AddRange(
-            new string[]
-            {
-                // ... add private dependencies that you statically link with here ...
-            }
-        );
+        if (Target.Type == TargetRules.TargetType.Editor)
+        {
+            PublicDependencyModuleNames.AddRange(
+                new string[]
+                {
+                    "UnrealEd"
+                }
+            );
+        }
     }
 }

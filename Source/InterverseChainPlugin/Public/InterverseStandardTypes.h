@@ -28,7 +28,7 @@ enum class EInterverseRarity : uint8
 };
 
 USTRUCT(BlueprintType)
-struct FInterverseBaseProperties
+struct INTERVERSECHAINPLUGIN_API FInterverseBaseProperties
 {
     GENERATED_BODY()
 
@@ -58,4 +58,15 @@ struct FInterverseBaseProperties
 
     UPROPERTY(BlueprintReadWrite, Category = "Interverse")
     TArray<FString> Tags;
+
+    UPROPERTY(BlueprintReadWrite, Category = "Interverse")
+    FString OwnerGlobalID;  // Player global ID
+
+    UPROPERTY(BlueprintReadWrite, Category = "Interverse")
+    FString TargetPlayerID;  // For transfers
+
+    bool IsValid() const
+    {
+        return !ModelIdentifier.IsEmpty();
+    }
 };

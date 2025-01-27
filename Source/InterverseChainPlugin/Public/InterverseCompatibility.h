@@ -2,15 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "InterverseStandardTypes.h"
+#include "InterverseChainDelegates.h"
 #include "Json.h"
-#include "Text.h"
 
 namespace InterverseCompat
 {
-    // Convert endpoints from Interverse to VERSE format
     inline FString GetEndpointPath(const FString& Endpoint)
     {
-        // Convert Interverse endpoints to VERSE endpoints
         FString Path = Endpoint;
         if (!Path.StartsWith(TEXT("verse/")))
         {
@@ -19,7 +17,6 @@ namespace InterverseCompat
         return Path;
     }
 
-    // Convert Interverse category enums to VERSE strings
     inline FString ConvertItemCategory(EInterverseItemCategory Category)
     {
         switch(Category)
@@ -36,7 +33,6 @@ namespace InterverseCompat
         }
     }
 
-    // Convert Interverse rarity enums to VERSE strings
     inline FString ConvertRarity(EInterverseRarity Rarity)
     {
         switch(Rarity)
@@ -51,32 +47,31 @@ namespace InterverseCompat
         }
     }
 
-    // Convert Interverse asset properties to VERSE JSON format
     inline TSharedPtr<FJsonObject> ConvertAssetToJson(const FInterverseBaseProperties& Properties, 
                                                      const TMap<FString, FString>& CustomProperties)
     {
         TSharedPtr<FJsonObject> JsonObject = MakeShared<FJsonObject>();
         
         // Convert base properties
-        JsonObject->SetStringField("category", ConvertItemCategory(Properties.Category));
-        JsonObject->SetStringField("rarity", ConvertRarity(Properties.Rarity));
-        JsonObject->SetNumberField("level", Properties.Level);
-        JsonObject->SetStringField("model_id", Properties.ModelIdentifier);
+        JsonObject->SetStringField(TEXT("category"), ConvertItemCategory(Properties.Category));
+        JsonObject->SetStringField(TEXT("rarity"), ConvertRarity(Properties.Rarity));
+        JsonObject->SetNumberField(TEXT("level"), Properties.Level);
+        JsonObject->SetStringField(TEXT("model_id"), Properties.ModelIdentifier);
 
         // Add colors
         TSharedPtr<FJsonObject> PrimaryColor = MakeShared<FJsonObject>();
-        PrimaryColor->SetNumberField("r", Properties.PrimaryColor.R);
-        PrimaryColor->SetNumberField("g", Properties.PrimaryColor.G);
-        PrimaryColor->SetNumberField("b", Properties.PrimaryColor.B);
-        PrimaryColor->SetNumberField("a", Properties.PrimaryColor.A);
-        JsonObject->SetObjectField("primary_color", PrimaryColor);
+        PrimaryColor->SetNumberField(TEXT("r"), Properties.PrimaryColor.R);
+        PrimaryColor->SetNumberField(TEXT("g"), Properties.PrimaryColor.G);
+        PrimaryColor->SetNumberField(TEXT("b"), Properties.PrimaryColor.B);
+        PrimaryColor->SetNumberField(TEXT("a"), Properties.PrimaryColor.A);
+        JsonObject->SetObjectField(TEXT("primary_color"), PrimaryColor);
 
         TSharedPtr<FJsonObject> SecondaryColor = MakeShared<FJsonObject>();
-        SecondaryColor->SetNumberField("r", Properties.SecondaryColor.R);
-        SecondaryColor->SetNumberField("g", Properties.SecondaryColor.G);
-        SecondaryColor->SetNumberField("b", Properties.SecondaryColor.B);
-        SecondaryColor->SetNumberField("a", Properties.SecondaryColor.A);
-        JsonObject->SetObjectField("secondary_color", SecondaryColor);
+        SecondaryColor->SetNumberField(TEXT("r"), Properties.SecondaryColor.R);
+        SecondaryColor->SetNumberField(TEXT("g"), Properties.SecondaryColor.G);
+        SecondaryColor->SetNumberField(TEXT("b"), Properties.SecondaryColor.B);
+        SecondaryColor->SetNumberField(TEXT("a"), Properties.SecondaryColor.A);
+        JsonObject->SetObjectField(TEXT("secondary_color"), SecondaryColor);
 
         // Convert numeric properties
         TSharedPtr<FJsonObject> NumericProps = MakeShared<FJsonObject>();
@@ -84,7 +79,7 @@ namespace InterverseCompat
         {
             NumericProps->SetNumberField(Pair.Key, Pair.Value);
         }
-        JsonObject->SetObjectField("numeric_properties", NumericProps);
+        JsonObject->SetObjectField(TEXT("numeric_properties"), NumericProps);
 
         // Convert string properties
         TSharedPtr<FJsonObject> StringProps = MakeShared<FJsonObject>();
@@ -92,7 +87,7 @@ namespace InterverseCompat
         {
             StringProps->SetStringField(Pair.Key, Pair.Value);
         }
-        JsonObject->SetObjectField("string_properties", StringProps);
+        JsonObject->SetObjectField(TEXT("string_properties"), StringProps);
 
         // Convert tags array
         TArray<TSharedPtr<FJsonValue>> TagsArray;
@@ -100,7 +95,7 @@ namespace InterverseCompat
         {
             TagsArray.Add(MakeShared<FJsonValueString>(Tag));
         }
-        JsonObject->SetArrayField("tags", TagsArray);
+        JsonObject->SetArrayField(TEXT("tags"), TagsArray);
 
         // Add custom properties
         TSharedPtr<FJsonObject> CustomProps = MakeShared<FJsonObject>();
@@ -108,29 +103,27 @@ namespace InterverseCompat
         {
             CustomProps->SetStringField(Pair.Key, Pair.Value);
         }
-        JsonObject->SetObjectField("custom_properties", CustomProps);
+        JsonObject->SetObjectField(TEXT("custom_properties"), CustomProps);
 
         return JsonObject;
     }
 
-    // Convert VERSE JSON response to Interverse asset
     inline bool ConvertJsonToAsset(const TSharedPtr<FJsonObject>& JsonObject, FInterverseAsset& OutAsset)
     {
         if (!JsonObject.IsValid())
             return false;
 
-        OutAsset.AssetId = JsonObject->GetStringField("asset_id");
-        OutAsset.Owner = JsonObject->GetStringField("owner");
+        OutAsset.AssetId = JsonObject->GetStringField(TEXT("asset_id"));
+        OutAsset.Owner = JsonObject->GetStringField(TEXT("owner"));
         
-        // Convert enums back from strings
-        FString CategoryStr = JsonObject->GetStringField("category");
-        if (CategoryStr == "WEAPON") OutAsset.Category = EInterverseItemCategory::Weapon;
-        else if (CategoryStr == "ARMOR") OutAsset.Category = EInterverseItemCategory::Armor;
+        FString CategoryStr = JsonObject->GetStringField(TEXT("category"));
+        if (CategoryStr == TEXT("WEAPON")) OutAsset.Category = EInterverseItemCategory::Weapon;
+        else if (CategoryStr == TEXT("ARMOR")) OutAsset.Category = EInterverseItemCategory::Armor;
         // ... add other category conversions
 
         // Convert metadata
         const TSharedPtr<FJsonObject>* MetadataObj;
-        if (JsonObject->TryGetObjectField("metadata", MetadataObj))
+        if (JsonObject->TryGetObjectField(TEXT("metadata"), MetadataObj))
         {
             for (const auto& Pair : (*MetadataObj)->Values)
             {
@@ -140,4 +133,4 @@ namespace InterverseCompat
 
         return true;
     }
-};
+}

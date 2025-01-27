@@ -6,8 +6,10 @@
 #include "WebSocketsModule.h"
 #include "IWebSocket.h"
 #include "InterverseStandardTypes.h"
+#include "InterverseChainDelegates.h"
 #include "InterverseChainComponent.generated.h"
 
+// Declare WebSocket delegates
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWebSocketConnected, bool, Success);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWebSocketMessage, const FString&, Message);
 
@@ -21,6 +23,15 @@ public:
 
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+    UFUNCTION(BlueprintCallable, Category = "Interverse|Chain")
+    void RecordTransaction(const FString& TransactionData);
+
+    UFUNCTION(BlueprintCallable, Category = "Interverse|Chain")
+    void GetLedgerState(FString& OutLedgerState);
+
+    UFUNCTION(BlueprintCallable, Category = "Interverse|Chain")
+    void GetTransactionHistory(const FString& Address, TArray<FString>& OutTransactions);
 
     UPROPERTY(BlueprintAssignable, Category = "Interverse|Events")
     FOnAssetMinted OnAssetMinted;
@@ -73,6 +84,15 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Interverse|Network")
     void SendWebSocketMessage(const FString& Message);
+
+    UFUNCTION(BlueprintPure, Category = "Interverse|Network")
+    bool IsWebSocketConnected() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Interverse|Network")
+    void ReconnectWebSocket();
+
+    UFUNCTION(BlueprintPure, Category = "Interverse|Network")
+    FString GetConnectionStatus() const;
 
 private:
     FHttpModule* Http;

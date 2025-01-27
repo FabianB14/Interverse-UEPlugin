@@ -208,7 +208,7 @@ void UInterverseChainComponent::OnHttpResponseReceived(
             if (InterverseCompat::ConvertJsonToAsset(*DataObject, Asset))
             {
                 AsyncTask(ENamedThreads::GameThread, [this, Asset]() {
-                    OnAssetMinted.Broadcast(Asset);
+                    OnAssetMinted.Broadcast(Asset, TEXT(""));
                 });
             }
         }
@@ -218,8 +218,8 @@ void UInterverseChainComponent::OnHttpResponseReceived(
             const bool Success = JsonObject->GetBoolField("success");
             
             AsyncTask(ENamedThreads::GameThread, [this, AssetId, Success]() {
-                OnTransferComplete.Broadcast(AssetId, Success);
-            });
+            OnTransferComplete.Broadcast(AssetId, TEXT(""), Success);  
+    });
         }
         else if (URL.Contains(TEXT("wallet/balance")))
         {
@@ -250,7 +250,7 @@ void UInterverseChainComponent::ProcessWebSocketMessage(const FString& Message)
                 if (InterverseCompat::ConvertJsonToAsset(*AssetObject, Asset))
                 {
                     AsyncTask(ENamedThreads::GameThread, [this, Asset]() {
-                        OnAssetMinted.Broadcast(Asset);
+                        OnAssetMinted.Broadcast(Asset, TEXT(""));
                     });
                 }
             }
@@ -274,11 +274,80 @@ void UInterverseChainComponent::ProcessWebSocketMessage(const FString& Message)
                 const FString AssetId = (*DataObject)->GetStringField("asset_id");
                 const bool Success = (*DataObject)->GetBoolField("success");
                 AsyncTask(ENamedThreads::GameThread, [this, AssetId, Success]() {
-                    OnTransferComplete.Broadcast(AssetId, Success);
+                     OnTransferComplete.Broadcast(AssetId, TEXT(""), Success);
                 });
             }
         }
     }
+}
+
+void UInterverseChainComponent::RecordTransaction(const FString& TransactionData)
+{
+    if (!TransactionData.IsEmpty())
+    {
+        // Send transaction data to blockchain
+        TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+        Request->OnProcessRequestComplete().BindUObject(this, &UInterverseChainComponent::OnHttpResponseReceived);
+        
+        FString Endpoint = InterverseCompat::GetEndpointPath(TEXT("transactions/record"));
+        Request->SetURL(FString::Printf(TEXT("%s/%s"), *NodeUrl, *Endpoint));
+        Request->SetVerb(TEXT("POST"));
+        Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+        Request->SetHeader(TEXT("X-API-Key"), ApiKey);
+        Request->SetContentAsString(TransactionData);
+        Request->ProcessRequest();
+    }
+}
+
+void UInterverseChainComponent::GetLedgerState(FString& OutLedgerState)
+{
+    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+    Request->OnProcessRequestComplete().BindLambda([&OutLedgerState](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+    {
+        if (bSuccess && Response.IsValid())
+        {
+            OutLedgerState = Response->GetContentAsString();
+        }
+    });
+    
+    Request->SetURL(FString::Printf(TEXT("%s/chain"), *NodeUrl));
+    Request->SetVerb(TEXT("GET"));
+    Request->SetHeader(TEXT("X-API-Key"), ApiKey);
+    Request->ProcessRequest();
+}
+
+void UInterverseChainComponent::GetTransactionHistory(const FString& Address, TArray<FString>& OutTransactions)
+{
+    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+    Request->OnProcessRequestComplete().BindLambda([&OutTransactions](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+    {
+        if (bSuccess && Response.IsValid())
+        {
+            TSharedPtr<FJsonObject> JsonObject;
+            TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+            
+            if (FJsonSerializer::Deserialize(Reader, JsonObject))
+            {
+                const TArray<TSharedPtr<FJsonValue>>* TransactionsArray;
+                if (JsonObject->TryGetArrayField(TEXT("transactions"), TransactionsArray))
+                {
+                    for (const auto& TransactionValue : *TransactionsArray)
+                    {
+                        FString TransactionString;
+                        if (TransactionValue->TryGetString(TransactionString))
+                        {
+                            OutTransactions.Add(TransactionString);
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    Request->SetURL(FString::Printf(TEXT("%s/transactions/%s"), *NodeUrl, *Address));
+    Request->SetVerb(TEXT("GET"));
+    Request->SetHeader(TEXT("X-API-Key"), ApiKey);
+    Request->ProcessRequest();
 }
 
 void UInterverseChainComponent::SendWebSocketMessage(const FString& Message)

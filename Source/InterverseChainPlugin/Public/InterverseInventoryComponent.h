@@ -14,6 +14,9 @@ struct FInterverseInventoryItem
     FInterverseAsset Asset;
 
     UPROPERTY(BlueprintReadWrite, Category = "Interverse")
+    FString OwnerGlobalID;  // Player global ID
+
+    UPROPERTY(BlueprintReadWrite, Category = "Interverse")
     bool IsEquipped;
 
     UPROPERTY(BlueprintReadWrite, Category = "Interverse")
@@ -30,8 +33,23 @@ class INTERVERSECHAINPLUGIN_API UInterverseInventoryComponent : public UActorCom
 public:    
     UInterverseInventoryComponent();
 
+    bool AddItem(const FInterverseAsset& Asset, const FString& PlayerGlobalID);
+    TArray<FInterverseInventoryItem> GetPlayerItems(const FString& PlayerGlobalID) const;
+
     UPROPERTY(BlueprintReadWrite, Category = "Interverse|Inventory")
     TArray<FInterverseInventoryItem> Items;
+
+    // Blueprint functions for player-aware inventory
+    UFUNCTION(BlueprintCallable, Category = "Interverse|Inventory")
+    bool AddItemToPlayerInventory(const FInterverseAsset& Asset, const FString& PlayerGlobalID);
+
+    UFUNCTION(BlueprintPure, Category = "Interverse|Inventory")
+    TArray<FInterverseInventoryItem> GetPlayerInventory(const FString& PlayerGlobalID) const;
+
+    UFUNCTION(BlueprintCallable, Category = "Interverse|Inventory")
+    bool TransferItemBetweenPlayers(const FString& AssetId, 
+                                  const FString& FromPlayerID, 
+                                  const FString& ToPlayerID);
 
     UPROPERTY(BlueprintAssignable, Category = "Interverse|Inventory")
     FOnInventoryUpdated OnInventoryUpdated;
