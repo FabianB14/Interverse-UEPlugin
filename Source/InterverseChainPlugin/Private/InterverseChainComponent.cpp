@@ -13,9 +13,12 @@ void UInterverseChainComponent::BeginPlay()
 {
     Super::BeginPlay();
 
+    UE_LOG(LogTemp, Log, TEXT("InterverseChainComponent BeginPlay"));
+
     if (NodeUrl.IsEmpty() || GameId.IsEmpty() || ApiKey.IsEmpty())
     {
-        UE_LOG(LogTemp, Warning, TEXT("Interverse: Missing configuration parameters"));
+        UE_LOG(LogTemp, Error, TEXT("Missing configuration - NodeUrl: %s, GameId: %s, ApiKey is %s"), 
+            *NodeUrl, *GameId, ApiKey.IsEmpty() ? TEXT("empty") : TEXT("set"));
         return;
     }
 
@@ -24,8 +27,9 @@ void UInterverseChainComponent::BeginPlay()
 
 void UInterverseChainComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    Super::EndPlay(EndPlayReason);
+    UE_LOG(LogTemp, Log, TEXT("InterverseChainComponent EndPlay"));
     DisconnectWebSocket();
+    Super::EndPlay(EndPlayReason);
 }
 
 void UInterverseChainComponent::CreateWallet()
@@ -139,32 +143,74 @@ void UInterverseChainComponent::ConnectWebSocket()
     if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
     {
         FModuleManager::Get().LoadModule("WebSockets");
+        if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to load WebSockets module"));
+            return;
+        }
+    }
+
+    if (NodeUrl.IsEmpty())
+    {
+        UE_LOG(LogTemp, Error, TEXT("NodeUrl is empty"));
+        return;
     }
 
     FString WsUrl = NodeUrl;
-    WsUrl.ReplaceInline(TEXT("http://"), TEXT("ws://"));
-    WsUrl.ReplaceInline(TEXT("https://"), TEXT("wss://"));
-    WsUrl.Append(TEXT("/ws"));
+    if (!WsUrl.StartsWith(TEXT("ws://")) && !WsUrl.StartsWith(TEXT("wss://")))
+    {
+        WsUrl.ReplaceInline(TEXT("http://"), TEXT("ws://"));
+        WsUrl.ReplaceInline(TEXT("https://"), TEXT("wss://"));
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("Attempting to connect to: %s"), *WsUrl);
 
     WebSocket = FWebSocketsModule::Get().CreateWebSocket(WsUrl, TEXT("verse-protocol"));
+    if (!WebSocket.IsValid())
+    {
+        UE_LOG(LogTemp, Error, TEXT("Failed to create WebSocket"));
+        return;
+    }
 
+    // Set up connection handler
     WebSocket->OnConnected().AddLambda([this]() {
-        // Send initial handshake
-        FString HandshakeMessage = FString::Printf(TEXT("{\"type\":\"handshake\",\"game_id\":\"%s\"}"), *GameId);
-        WebSocket->Send(HandshakeMessage);
+        UE_LOG(LogTemp, Log, TEXT("WebSocket Connected"));
+        if (!GameId.IsEmpty())
+        {
+            FString HandshakeMessage = FString::Printf(TEXT("{\"type\":\"handshake\",\"game_id\":\"%s\"}"), *GameId);
+            WebSocket->Send(HandshakeMessage);
+            UE_LOG(LogTemp, Log, TEXT("Sent handshake: %s"), *HandshakeMessage);
+        }
         
         AsyncTask(ENamedThreads::GameThread, [this]() {
             OnWebSocketConnected.Broadcast(true);
         });
     });
 
+    // Set up error handler
+    WebSocket->OnConnectionError().AddLambda([this](const FString& Error) {
+        UE_LOG(LogTemp, Error, TEXT("WebSocket Connection Error: %s"), *Error);
+        AsyncTask(ENamedThreads::GameThread, [this]() {
+            OnWebSocketConnected.Broadcast(false);
+        });
+    });
+
+    // Set up message handler
     WebSocket->OnMessage().AddLambda([this](const FString& MessageStr) {
+        UE_LOG(LogTemp, Log, TEXT("Received WebSocket message: %s"), *MessageStr);
         AsyncTask(ENamedThreads::GameThread, [this, MessageStr]() {
             OnWebSocketMessage.Broadcast(MessageStr);
             ProcessWebSocketMessage(MessageStr);
         });
     });
 
+    // Set up close handler
+    WebSocket->OnClosed().AddLambda([this](int32 StatusCode, const FString& Reason, bool bWasClean) {
+        UE_LOG(LogTemp, Warning, TEXT("WebSocket Closed - Status: %d, Reason: %s, Clean: %d"), 
+            StatusCode, *Reason, bWasClean);
+    });
+
+    UE_LOG(LogTemp, Log, TEXT("Initiating WebSocket connection"));
     WebSocket->Connect();
 }
 
@@ -172,6 +218,7 @@ void UInterverseChainComponent::DisconnectWebSocket()
 {
     if (WebSocket.IsValid() && WebSocket->IsConnected())
     {
+        UE_LOG(LogTemp, Log, TEXT("Disconnecting WebSocket"));
         WebSocket->Close();
     }
 }
@@ -354,11 +401,12 @@ void UInterverseChainComponent::SendWebSocketMessage(const FString& Message)
 {
     if (WebSocket.IsValid() && WebSocket->IsConnected())
     {
+        UE_LOG(LogTemp, Verbose, TEXT("Sending WebSocket message: %s"), *Message);
         WebSocket->Send(Message);
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("WebSocket not connected. Cannot send message."));
+        UE_LOG(LogTemp, Warning, TEXT("Cannot send message - WebSocket not connected"));
     }
 }
 
@@ -369,6 +417,7 @@ bool UInterverseChainComponent::IsWebSocketConnected() const
 
 void UInterverseChainComponent::ReconnectWebSocket()
 {
+    UE_LOG(LogTemp, Log, TEXT("Attempting to reconnect WebSocket"));
     DisconnectWebSocket();
     ConnectWebSocket();
 }
