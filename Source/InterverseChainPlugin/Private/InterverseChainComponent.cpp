@@ -140,12 +140,12 @@ void UInterverseChainComponent::GetPlayerAssets(const FString& PlayerAddress)
 
 void UInterverseChainComponent::ConnectWebSocket()
 
-// Create WebSocket with additional headers
+{
+    // Create WebSocket with additional headers
     TMap<FString, FString> Headers;
     Headers.Add(TEXT("Sec-WebSocket-Protocol"), TEXT("verse-protocol"));
     Headers.Add(TEXT("Upgrade"), TEXT("websocket"));
     Headers.Add(TEXT("Connection"), TEXT("Upgrade"));
-{
     if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
     {
         FModuleManager::Get().LoadModule("WebSockets");
