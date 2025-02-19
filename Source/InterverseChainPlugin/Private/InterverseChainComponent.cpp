@@ -139,13 +139,7 @@ void UInterverseChainComponent::GetPlayerAssets(const FString& PlayerAddress)
 }
 
 void UInterverseChainComponent::ConnectWebSocket()
-
 {
-    // Create WebSocket with additional headers
-    TMap<FString, FString> Headers;
-    Headers.Add(TEXT("Sec-WebSocket-Protocol"), TEXT("verse-protocol"));
-    Headers.Add(TEXT("Upgrade"), TEXT("websocket"));
-    Headers.Add(TEXT("Connection"), TEXT("Upgrade"));
     if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
     {
         FModuleManager::Get().LoadModule("WebSockets");
@@ -156,22 +150,38 @@ void UInterverseChainComponent::ConnectWebSocket()
         }
     }
 
-    if (NodeUrl.IsEmpty())
+    if (NodeUrl.IsEmpty() || ApiKey.IsEmpty())
     {
-        UE_LOG(LogTemp, Error, TEXT("NodeUrl is empty"));
+        UE_LOG(LogTemp, Error, TEXT("NodeUrl or ApiKey is empty"));
         return;
     }
 
+    // Construct WebSocket URL with API key
     FString WsUrl = NodeUrl;
     if (!WsUrl.StartsWith(TEXT("ws://")) && !WsUrl.StartsWith(TEXT("wss://")))
     {
         WsUrl.ReplaceInline(TEXT("http://"), TEXT("ws://"));
         WsUrl.ReplaceInline(TEXT("https://"), TEXT("wss://"));
     }
+    
+    // Ensure URL ends with /ws and includes API key
+    if (!WsUrl.EndsWith(TEXT("/ws")))
+    {
+        WsUrl = FString::Printf(TEXT("%s/ws"), *WsUrl);
+    }
+    WsUrl = FString::Printf(TEXT("%s?api_key=%s"), *WsUrl, *ApiKey);
 
     UE_LOG(LogTemp, Log, TEXT("Attempting to connect to: %s"), *WsUrl);
 
-    WebSocket = FWebSocketsModule::Get().CreateWebSocket(WsUrl, TEXT("verse-protocol"));
+    // Create headers map with required upgrade headers
+    TMap<FString, FString> Headers;
+    Headers.Add(TEXT("Upgrade"), TEXT("websocket"));
+    Headers.Add(TEXT("Connection"), TEXT("Upgrade"));
+    Headers.Add(TEXT("Sec-WebSocket-Protocol"), TEXT("verse-protocol"));
+    Headers.Add(TEXT("Sec-WebSocket-Version"), TEXT("13"));
+
+    WebSocket = FWebSocketsModule::Get().CreateWebSocket(WsUrl, TEXT("verse-protocol"), Headers);
+
     if (!WebSocket.IsValid())
     {
         UE_LOG(LogTemp, Error, TEXT("Failed to create WebSocket"));
