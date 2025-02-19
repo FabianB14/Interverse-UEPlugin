@@ -5,6 +5,8 @@
 #include "Http.h"
 #include "WebSocketsModule.h"
 #include "IWebSocket.h"
+#include "TimerManager.h"
+#include "Async/AsyncWork.h"
 #include "InterverseStandardTypes.h"
 #include "InterverseChainDelegates.h"
 #include "InterverseChainComponent.generated.h"
@@ -23,6 +25,7 @@ public:
 
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     UFUNCTION(BlueprintCallable, Category = "Interverse|Chain")
     void RecordTransaction(const FString& TransactionData);
@@ -32,6 +35,18 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Interverse|Chain")
     void GetTransactionHistory(const FString& Address, TArray<FString>& OutTransactions);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
+    FString NodeUrl;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
+    FString GameId;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
+    FString ApiKey;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
+    float ReconnectDelay = 5.0f;
 
     UPROPERTY(BlueprintAssignable, Category = "Interverse|Events")
     FOnAssetMinted OnAssetMinted;
@@ -47,15 +62,6 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "Interverse|Events")
     FOnWebSocketMessage OnWebSocketMessage;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
-    FString NodeUrl;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
-    FString GameId;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interverse|Configuration")
-    FString ApiKey;
 
     UFUNCTION(BlueprintCallable, Category = "Interverse|Wallet")
     void CreateWallet();
@@ -97,7 +103,9 @@ public:
 private:
     FHttpModule* Http;
     TSharedPtr<IWebSocket> WebSocket;
+    FTimerHandle ReconnectTimerHandle;
 
     void OnHttpResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
     void ProcessWebSocketMessage(const FString& Message);
+    void ScheduleReconnect();
 };

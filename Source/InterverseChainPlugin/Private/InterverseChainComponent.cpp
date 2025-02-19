@@ -140,93 +140,134 @@ void UInterverseChainComponent::GetPlayerAssets(const FString& PlayerAddress)
 
 void UInterverseChainComponent::ConnectWebSocket()
 {
-    if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
+    // Load WebSocket module for UE5
+    const FName WebSocketModuleName = TEXT("WebSockets");
+    if (!FModuleManager::Get().IsModuleLoaded(WebSocketModuleName))
     {
-        FModuleManager::Get().LoadModule("WebSockets");
-        if (!FModuleManager::Get().IsModuleLoaded("WebSockets"))
+        FModuleManager::Get().LoadModule(WebSocketModuleName);
+        if (!FModuleManager::Get().IsModuleLoaded(WebSocketModuleName))
         {
             UE_LOG(LogTemp, Error, TEXT("Failed to load WebSockets module"));
             return;
         }
     }
 
+    // Validate configuration
     if (NodeUrl.IsEmpty() || ApiKey.IsEmpty())
     {
         UE_LOG(LogTemp, Error, TEXT("NodeUrl or ApiKey is empty"));
         return;
     }
 
-    // Construct WebSocket URL with API key
+    // Construct WebSocket URL for UE5
     FString WsUrl = NodeUrl;
-    if (!WsUrl.StartsWith(TEXT("ws://")) && !WsUrl.StartsWith(TEXT("wss://")))
+    WsUrl.ReplaceInline(TEXT("http://"), TEXT("ws://"));
+    WsUrl.ReplaceInline(TEXT("https://"), TEXT("wss://"));
+    
+    // Remove any trailing slashes for UE5
+    while (WsUrl.EndsWith(TEXT("/")))
     {
-        WsUrl.ReplaceInline(TEXT("http://"), TEXT("ws://"));
-        WsUrl.ReplaceInline(TEXT("https://"), TEXT("wss://"));
+        WsUrl.LeftChopInline(1);
     }
     
-    // Ensure URL ends with /ws and includes API key
-    if (!WsUrl.EndsWith(TEXT("/ws")))
-    {
-        WsUrl = FString::Printf(TEXT("%s/ws"), *WsUrl);
-    }
-    WsUrl = FString::Printf(TEXT("%s?api_key=%s"), *WsUrl, *ApiKey);
+    // Add /ws endpoint and API key
+    WsUrl = FString::Printf(TEXT("%s/ws?api_key=%s"), *WsUrl, *ApiKey);
+    
+    UE_LOG(LogTemp, Log, TEXT("UE5 Connecting to WebSocket URL: %s"), *WsUrl);
 
-    UE_LOG(LogTemp, Log, TEXT("Attempting to connect to: %s"), *WsUrl);
-
-    // Create headers map with required upgrade headers
+    // UE5 specific headers
     TMap<FString, FString> Headers;
+    Headers.Add(TEXT("Sec-WebSocket-Protocol"), TEXT("verse-protocol"));
     Headers.Add(TEXT("Upgrade"), TEXT("websocket"));
     Headers.Add(TEXT("Connection"), TEXT("Upgrade"));
-    Headers.Add(TEXT("Sec-WebSocket-Protocol"), TEXT("verse-protocol"));
     Headers.Add(TEXT("Sec-WebSocket-Version"), TEXT("13"));
 
+    // Create WebSocket with UE5's implementation
     WebSocket = FWebSocketsModule::Get().CreateWebSocket(WsUrl, TEXT("verse-protocol"), Headers);
-
+    
     if (!WebSocket.IsValid())
     {
-        UE_LOG(LogTemp, Error, TEXT("Failed to create WebSocket"));
+        UE_LOG(LogTemp, Error, TEXT("Failed to create WebSocket in UE5"));
         return;
     }
 
-    // Set up connection handler
-    WebSocket->OnConnected().AddLambda([this]() {
-        UE_LOG(LogTemp, Log, TEXT("WebSocket Connected"));
+    // UE5 connection handler with improved lambda capture
+    WebSocket->OnConnected().AddLambda([this, WsUrl]() {
+        UE_LOG(LogTemp, Log, TEXT("UE5 WebSocket Connected to: %s"), *WsUrl);
+        
+        // Use UE5's task graph for game thread execution
+        FSimpleDelegateGraphTask::CreateAndDispatchWhenReady(
+            FSimpleDelegateGraphTask::FDelegate::CreateLambda([this]()
+            {
+                OnWebSocketConnected.Broadcast(true);
+            }),
+            TStatId(),
+            nullptr,
+            ENamedThreads::GameThread
+        );
+        
+        // Send initial handshake
         if (!GameId.IsEmpty())
         {
-            FString HandshakeMessage = FString::Printf(TEXT("{\"type\":\"handshake\",\"game_id\":\"%s\"}"), *GameId);
+            const FString HandshakeMessage = FString::Printf(TEXT("{\"type\":\"handshake\",\"game_id\":\"%s\"}"), *GameId);
             WebSocket->Send(HandshakeMessage);
-            UE_LOG(LogTemp, Log, TEXT("Sent handshake: %s"), *HandshakeMessage);
+            UE_LOG(LogTemp, Log, TEXT("Sent UE5 handshake: %s"), *HandshakeMessage);
         }
-        
-        AsyncTask(ENamedThreads::GameThread, [this]() {
-            OnWebSocketConnected.Broadcast(true);
-        });
     });
 
-    // Set up error handler
+    // UE5 error handler
     WebSocket->OnConnectionError().AddLambda([this](const FString& Error) {
-        UE_LOG(LogTemp, Error, TEXT("WebSocket Connection Error: %s"), *Error);
-        AsyncTask(ENamedThreads::GameThread, [this]() {
-            OnWebSocketConnected.Broadcast(false);
-        });
+        UE_LOG(LogTemp, Error, TEXT("UE5 WebSocket Connection Error: %s"), *Error);
+        
+        FSimpleDelegateGraphTask::CreateAndDispatchWhenReady(
+            FSimpleDelegateGraphTask::FDelegate::CreateLambda([this]()
+            {
+                OnWebSocketConnected.Broadcast(false);
+            }),
+            TStatId(),
+            nullptr,
+            ENamedThreads::GameThread
+        );
     });
 
-    // Set up message handler
+    // UE5 message handler with improved type safety
     WebSocket->OnMessage().AddLambda([this](const FString& MessageStr) {
-        UE_LOG(LogTemp, Log, TEXT("Received WebSocket message: %s"), *MessageStr);
-        AsyncTask(ENamedThreads::GameThread, [this, MessageStr]() {
-            OnWebSocketMessage.Broadcast(MessageStr);
-            ProcessWebSocketMessage(MessageStr);
-        });
+        UE_LOG(LogTemp, Verbose, TEXT("UE5 Received WebSocket message: %s"), *MessageStr);
+        
+        FSimpleDelegateGraphTask::CreateAndDispatchWhenReady(
+            FSimpleDelegateGraphTask::FDelegate::CreateLambda([this, MessageStr]()
+            {
+                OnWebSocketMessage.Broadcast(MessageStr);
+                ProcessWebSocketMessage(MessageStr);
+            }),
+            TStatId(),
+            nullptr,
+            ENamedThreads::GameThread
+        );
     });
 
-    // Set up close handler
+    // UE5 close handler with status code
     WebSocket->OnClosed().AddLambda([this](int32 StatusCode, const FString& Reason, bool bWasClean) {
-        UE_LOG(LogTemp, Warning, TEXT("WebSocket Closed - Status: %d, Reason: %s, Clean: %d"), 
+        UE_LOG(LogTemp, Warning, TEXT("UE5 WebSocket Closed - Status: %d, Reason: %s, Clean: %d"), 
             StatusCode, *Reason, bWasClean);
+            
+        // Optionally attempt reconnection if wasn't a clean close
+        if (!bWasClean)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("UE5 WebSocket connection was not clean, scheduling reconnect"));
+            // Schedule reconnection attempt after delay
+            FTimerHandle ReconnectTimerHandle;
+            GetWorld()->GetTimerManager().SetTimer(
+                ReconnectTimerHandle,
+                this,
+                &UInterverseChainComponent::ReconnectWebSocket,
+                5.0f,  // 5 second delay
+                false
+            );
+        }
     });
 
-    UE_LOG(LogTemp, Log, TEXT("Initiating WebSocket connection"));
+    UE_LOG(LogTemp, Log, TEXT("UE5 Initiating WebSocket connection"));
     WebSocket->Connect();
 }
 
